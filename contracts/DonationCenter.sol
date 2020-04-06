@@ -58,7 +58,6 @@ library SafeMath {
     function sub(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
         require(b <= a, errorMessage);
         uint256 c = a - b;
-
         return c;
     }
 
@@ -174,16 +173,20 @@ contract DonationCenter {
 
     address private _dai;
     address private _donation_token;
+    
+    uint256 month_collected; 
+    
+    mapping (address => uint256) subsidies_registry;
 
     bytes4 private constant SELECTOR_MINT = bytes4(keccak256(bytes('mint(address,uint256)')));
     bytes4 private constant SELECTOR_BURN = bytes4(keccak256(bytes('burnFrom(address,uint256)')));
     bytes4 private constant SELECTOR_TRANSFER = bytes4(keccak256(bytes('transfer(address,uint256)')));
     bytes4 private constant SELECTOR_TRANSFER_FROM = bytes4(keccak256(bytes('transferFrom(address,address,uint256)')));
+    bytes4 private constant SELECTOR_IS_RECEIVER = bytes4(keccak256(bytes('isReceiver(address)')));
 
     event Donation (address indexed sender, uint256 amount);
     event Collection (address indexed sender, uint256 amount);
-    
-    event Debug(bool success);
+    event Subsidy (address indexed receiver, uint256 amount);
 
     function _safeMint(address to, uint value) private {
         (bool success, bytes memory data) = _donation_token.call(abi.encodeWithSelector(SELECTOR_MINT, to, value));
@@ -202,8 +205,30 @@ contract DonationCenter {
 
     function _safeTransferFrom(address token, address _from, address to, uint value) private {
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(SELECTOR_TRANSFER_FROM, _from, to, value));
-        emit Debug(success);
         require(success && (data.length == 0 || abi.decode(data, (bool))), 'Token transfer_from: TRANSFER_FAILED');
+    }
+    
+    function _safeIsSubsidy(address to) private returns (bool) {
+        (bool success, bytes memory data) = _donation_token.call(abi.encodeWithSelector(SELECTOR_IS_RECEIVER, to));
+        require(success, 'IsSubdidy get: GET_FAILED');
+        return abi.decode(data, (bool));
+    }
+    
+    function _daysToDate(uint _days) internal pure returns (uint year, uint month, uint day) {
+        int __days = int(_days);
+        int L = __days + 68569 + 2440588;
+        int N = 4 * L / 146097;
+        L = L - (146097 * N + 3) / 4;
+        int _year = 4000 * (L + 1) / 1461001;
+        L = L - 1461 * _year / 4 + 31;
+        int _month = 80 * L / 2447;
+        int _day = L - 2447 * _month / 80;
+        L = _month / 11;
+        _month = _month + 2 - 12 * L;
+        _year = 100 * (N - 49) + _year + L;
+        year = uint(_year);
+        month = uint(_month);
+        day = uint(_day);
     }
 
     /** 
@@ -268,18 +293,16 @@ contract DonationCenter {
         _safeTransfer(_dai, msg.sender, dt_amount);
         emit Collection(msg.sender, dt_amount);
     }
-
-     /** 
+    
+    /** 
     *
-    * @dev Gives `amount` dai tokens from the contract's account to caller
-    * and burns `amount`of donation tokens to the contract.
+    * @dev Gives `amount` donation tokens from the contract's account to caller
+    * if applies conditions.
     *
     * Returns a boolean value indicating whether the operation succeeded.
     *
-    * Emits a {Collection} event.
+    * Emits a {Subsidy} event.
     *
-    * The tokens will be withdrawn from the contract _dai.
-    * The tokens will be minted in contract _donation_token.
     */
     
     function getSubidy() public {

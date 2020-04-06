@@ -5,7 +5,7 @@ RUN cd deployment && npm install
 
 COPY scripts/deploy.js deployment/
 COPY scripts/utils.js deployment/
-
+  
 COPY deploy/DYBToken.abi deployment/abi/
 COPY deploy/DYBToken.bin deployment/bin/
 COPY contracts/DYBToken.sol deployment/contracts/
