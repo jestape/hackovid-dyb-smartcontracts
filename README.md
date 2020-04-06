@@ -1,7 +1,7 @@
 
-# Red Cross ICO + Crowdsale
+# DoYourBit token plaform
 
-Generic code to automatically deploy the Red Cross' ICO & Crowdsale.
+Generic code to automatically deploy the DoYourBit token plaform.
 
 ## Requirements
 
@@ -12,8 +12,8 @@ Generic code to automatically deploy the Red Cross' ICO & Crowdsale.
 ## Setup
 Clone this repository
 
-    git clone https://github.com/marcbaque/redcross-ico.git
-    cd redcross-ico
+    git clone git@github.com:jestape/hackovid-dyb-smartcontracts.git
+    cd hackovid-dyb-smartcontracts
 
 Set up .env file
 
