@@ -1,0 +1,28 @@
+{
+  "name": "redcross-ico",
+  "version": "1.0.0",
+  "description": "Deployment of a physical asset ICO",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marcbaque/redcross-ico.git"
+  },
+  "author": "Marc Baqué",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/marcbaque/redcross-ico/issues"
+  },
+  "homepage": "https://github.com/marcbaque/redcross-ico#readme",
+  "dependencies": {
+    "axios": "^0.19.2",
+    "dotenv": "^8.2.0",
+    "truffle-hdwallet-provider": "^1.0.17",
+    "web3": "^1.2.6"
+  }
+}
