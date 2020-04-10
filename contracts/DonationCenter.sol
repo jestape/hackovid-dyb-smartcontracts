@@ -362,6 +362,10 @@ contract DonationCenter {
             _cicle = 1;
         }
 
+        if (_today_subsidy > DAILY_SUBSIDY_CAP) {
+            _today_subsidy = DAILY_SUBSIDY_CAP;
+         }
+
         require(_safeIsSubsidy(msg.sender), 'Subsidy not accepted');
         require(_safeLastSubsidy(msg.sender) != today, 'Subsidy already given');
         _safeTransfer(_donation_token, msg.sender, _today_subsidy);
