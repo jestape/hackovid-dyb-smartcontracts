@@ -97,7 +97,8 @@ const donationSourceCode = fs.readFileSync('./contracts/DonationCenter.sol', 'ut
                 [DAIdeployedToken.options.address,
                     DYBdeployedToken.options.address]));
 
-    await DYBdeployedToken.methods.addMinter(deployedDonation.options.address).send({ from: accounts[0]});
-    await DYBdeployedToken.methods.addManager(deployedDonation.options.address).send({ from: accounts[0]});
+    await DYBdeployedToken.methods.addLogic(deployedDonation.options.address).send({from: accounts[0]});
+    await DAIdeployedToken.methods.approve(deployedDonation.options.address, 100000).send({from: accounts[0]});
+    await deployedDonation.methods.donate(10000).send({from: accounts[0]});
 
 })();

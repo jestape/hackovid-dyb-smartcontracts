@@ -173,16 +173,28 @@ contract DonationCenter {
 
     address private _dai;
     address private _donation_token;
-    
-    uint256 month_collected; 
-    
-    mapping (address => uint256) subsidies_registry;
+
+    uint256 private _cicle = 0;
+    uint256 private _today = 0;
+
+    uint256 private _day1_total_donated = 0;
+    uint256 private _day2_total_donated = 0; 
+
+    uint256 private _day1_total_subsidized = 0;
+    uint256 private _day2_total_subsidized = 0; 
+
+    uint256 private _today_subsidy = 0;
+
+    uint256 constant DAILY_SUBSIDY_CAP = 4000;
 
     bytes4 private constant SELECTOR_MINT = bytes4(keccak256(bytes('mint(address,uint256)')));
     bytes4 private constant SELECTOR_BURN = bytes4(keccak256(bytes('burnFrom(address,uint256)')));
     bytes4 private constant SELECTOR_TRANSFER = bytes4(keccak256(bytes('transfer(address,uint256)')));
     bytes4 private constant SELECTOR_TRANSFER_FROM = bytes4(keccak256(bytes('transferFrom(address,address,uint256)')));
-    bytes4 private constant SELECTOR_IS_RECEIVER = bytes4(keccak256(bytes('isReceiver(address)')));
+    bytes4 private constant SELECTOR_IS_BUYER = bytes4(keccak256(bytes('isBuyer(address)')));
+    bytes4 private constant SELECTOR_AMOUNT_BUYERS = bytes4(keccak256(bytes('amountBuyers()')));
+    bytes4 private constant SELECTOR_LAST_SUBSIDY = bytes4(keccak256(bytes('getLastSubsidy(address)')));
+    bytes4 private constant SELECTOR_SET_LAST_SUBSIDY = bytes4(keccak256(bytes('setLastSubsidy(address,uint256)')));
 
     event Donation (address indexed sender, uint256 amount);
     event Collection (address indexed sender, uint256 amount);
@@ -207,14 +219,31 @@ contract DonationCenter {
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(SELECTOR_TRANSFER_FROM, _from, to, value));
         require(success && (data.length == 0 || abi.decode(data, (bool))), 'Token transfer_from: TRANSFER_FAILED');
     }
+
+    function _safeSetLastSubsidy(address to, uint256 day) private returns (uint256) {
+        (bool success, bytes memory data) = _donation_token.call(abi.encodeWithSelector(SELECTOR_SET_LAST_SUBSIDY, to, day));
+        require(success, 'SetLastSubsidy get: GET_FAILED');
+    }
     
     function _safeIsSubsidy(address to) private returns (bool) {
-        (bool success, bytes memory data) = _donation_token.call(abi.encodeWithSelector(SELECTOR_IS_RECEIVER, to));
+        (bool success, bytes memory data) = _donation_token.call(abi.encodeWithSelector(SELECTOR_IS_BUYER, to));
         require(success, 'IsSubdidy get: GET_FAILED');
         return abi.decode(data, (bool));
     }
+
+    function _safeAmountBuyers() private returns (uint256) {
+        (bool success, bytes memory data) = _donation_token.call(abi.encodeWithSelector(SELECTOR_AMOUNT_BUYERS));
+        require(success, 'IsSubdidy get: GET_FAILED');
+        return abi.decode(data, (uint256));
+    }
+
+    function _safeLastSubsidy(address to) private returns (uint256) {
+        (bool success, bytes memory data) = _donation_token.call(abi.encodeWithSelector(SELECTOR_LAST_SUBSIDY, to));
+        require(success, 'LastSubdidy get: GET_FAILED');
+        return abi.decode(data, (uint256));
+    }
     
-    function _daysToDate(uint _days) internal pure returns (uint year, uint month, uint day) {
+    function _daysToDate(uint _days) internal pure returns (uint day) {
         int __days = int(_days);
         int L = __days + 68569 + 2440588;
         int N = 4 * L / 146097;
@@ -223,11 +252,6 @@ contract DonationCenter {
         L = L - 1461 * _year / 4 + 31;
         int _month = 80 * L / 2447;
         int _day = L - 2447 * _month / 80;
-        L = _month / 11;
-        _month = _month + 2 - 12 * L;
-        _year = 100 * (N - 49) + _year + L;
-        year = uint(_year);
-        month = uint(_month);
         day = uint(_day);
     }
 
@@ -243,6 +267,7 @@ contract DonationCenter {
    constructor(address dai, address donation_token) public {
        _dai = dai;
        _donation_token = donation_token;
+       _today = _daysToDate(block.timestamp);
     }
 
     function dai_address() public view returns (address) {
@@ -268,8 +293,16 @@ contract DonationCenter {
  
     function donate(uint256 dai_amount) public returns (bool) {
         require(dai_amount > 0, 'INSUFFICIENT_INPUT_AMOUNT');
+
         _safeMint(address(this), dai_amount);
         _safeTransferFrom(_dai, msg.sender, address(this), dai_amount);
+
+        if (_cicle < 1) {
+            _day1_total_donated = _day1_total_donated + dai_amount;
+        } else {
+            _day2_total_donated = _day2_total_donated + dai_amount;
+        }
+        
         emit Donation(msg.sender, dai_amount);
         return true;
     }
@@ -287,7 +320,7 @@ contract DonationCenter {
     * The tokens will be minted in contract _donation_token.
     */
 
-    function collect_dai(uint256 dt_amount) public {
+    function collectDai(uint256 dt_amount) public {
         require(dt_amount > 0, 'INSUFFICIENT_INPUT_AMOUNT');
         _safeBurnFrom(msg.sender, dt_amount);
         _safeTransfer(_dai, msg.sender, dt_amount);
@@ -305,14 +338,43 @@ contract DonationCenter {
     *
     */
     
-    function getSubidy() public {
-        (,uint last_month,) = _daysToDate(subsidies_registry[msg.sender]);
-        (,uint actual_month,) = _daysToDate(block.timestamp);
+    function getSubsidy() public {
+        
+        uint256 today = _daysToDate(block.timestamp);
+
+        if (_cicle == 0) {
+            _today_subsidy = _day1_total_donated / _safeAmountBuyers();
+            _today = today;
+            _cicle = 1;
+        } else if (today != _today && _cicle == 1) {
+            _day2_total_donated = _day1_total_donated - _day1_total_subsidized;
+            _day1_total_donated = 0;
+            _day1_total_subsidized = 0;
+            _today_subsidy = _day2_total_donated / _safeAmountBuyers();
+            _today = today;
+            _cicle = 2;
+        } else if (today != _today && _cicle == 1) {
+            _day1_total_donated = _day2_total_donated - _day2_total_subsidized;
+            _day2_total_donated = 0;
+            _day2_total_subsidized = 0;
+            _today_subsidy = _day1_total_donated / _safeAmountBuyers();
+            _today = today;
+            _cicle = 1;
+        }
+
         require(_safeIsSubsidy(msg.sender), 'Subsidy not accepted');
-        require(last_month < actual_month, 'Subsidy already given');
-        _safeTransfer(_donation_token, msg.sender, 100);
-        emit Subsidy(msg.sender, 100);
-        subsidies_registry[msg.sender] = actual_month;
+        require(_safeLastSubsidy(msg.sender) != today, 'Subsidy already given');
+        _safeTransfer(_donation_token, msg.sender, _today_subsidy);
+        _safeSetLastSubsidy(msg.sender,today);
+        
+        if (_cicle == 1) {
+            _day1_total_subsidized = _day1_total_subsidized + _today_subsidy;
+        } else {
+            _day2_total_subsidized = _day2_total_subsidized + _today_subsidy;
+        }
+
+        emit Subsidy(msg.sender, _today_subsidy);
+        
     }
 
 }
