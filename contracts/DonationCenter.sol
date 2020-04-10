@@ -195,6 +195,7 @@ contract DonationCenter {
     bytes4 private constant SELECTOR_AMOUNT_BUYERS = bytes4(keccak256(bytes('amountBuyers()')));
     bytes4 private constant SELECTOR_LAST_SUBSIDY = bytes4(keccak256(bytes('getLastSubsidy(address)')));
     bytes4 private constant SELECTOR_SET_LAST_SUBSIDY = bytes4(keccak256(bytes('setLastSubsidy(address,uint256)')));
+    bytes4 private constant SELECTOR_GET_BALANCE = bytes4(keccak256(bytes('balanceOf(address)')));
 
     event Donation (address indexed sender, uint256 amount);
     event Collection (address indexed sender, uint256 amount);
@@ -240,6 +241,12 @@ contract DonationCenter {
     function _safeLastSubsidy(address to) private returns (uint256) {
         (bool success, bytes memory data) = _donation_token.call(abi.encodeWithSelector(SELECTOR_LAST_SUBSIDY, to));
         require(success, 'LastSubdidy get: GET_FAILED');
+        return abi.decode(data, (uint256));
+    }
+
+     function _safeGetBalance(address from) private returns (uint256) {
+        (bool success, bytes memory data) = _donation_token.call(abi.encodeWithSelector(SELECTOR_GET_BALANCE, from));
+        require(success, 'Get Balance: GET_FAILED');
         return abi.decode(data, (uint256));
     }
     
@@ -320,11 +327,12 @@ contract DonationCenter {
     * The tokens will be minted in contract _donation_token.
     */
 
-    function collectDai(uint256 dt_amount) public {
-        require(dt_amount > 0, 'INSUFFICIENT_INPUT_AMOUNT');
-        _safeBurnFrom(msg.sender, dt_amount);
-        _safeTransfer(_dai, msg.sender, dt_amount);
-        emit Collection(msg.sender, dt_amount);
+    function collectDai() public {
+        uint256 balance = _safeGetBalance(msg.sender);
+        require(balance > 0, 'INSUFFICIENT_INPUT_AMOUNT');
+        _safeBurnFrom(msg.sender, balance);
+        _safeTransfer(_dai, msg.sender, balance);
+        emit Collection(msg.sender, balance);
     }
     
     /** 

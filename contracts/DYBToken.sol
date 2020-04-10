@@ -812,7 +812,8 @@ contract ERC20Managed is ERC20, BuyerRole, SellerRole {
     }
 
     function transfer(address recipient, uint256 amount) public returns (bool) {
-        require(isBuyer(msg.sender) || isLogic(msg.sender));
+        require(isBuyer(msg.sender) || isLogic(msg.sender), "Not allowed to transfer");
+        require(isSeller(recipient) || isLogic(msg.sender), "Not allowed to receive");
         return super.transfer(recipient, amount);
     }
     
@@ -846,8 +847,8 @@ contract DYBToken is ERC20Managed, ERC20Mintable, ERC20Burnable, ERC20Detailed {
     
 }
 
-contract DaiToken is ERC20 {
-    constructor() public {
+contract DaiToken is ERC20, ERC20Detailed {
+    constructor() public ERC20Detailed("TestingDai", "tDAI", 2) {
         _mint(msg.sender, 1000000000000000000000000);
     }
 }
