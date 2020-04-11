@@ -197,9 +197,9 @@ contract DonationCenter {
     bytes4 private constant SELECTOR_SET_LAST_SUBSIDY = bytes4(keccak256(bytes('setLastSubsidy(address,uint256)')));
     bytes4 private constant SELECTOR_GET_BALANCE = bytes4(keccak256(bytes('balanceOf(address)')));
 
-    event Donation (address indexed sender, uint256 amount);
-    event Collection (address indexed sender, uint256 amount);
-    event Subsidy (address indexed receiver, uint256 amount);
+    event Donation (address indexed sender, uint256 amount, uint256 timestamp);
+    event Collection (address indexed sender, uint256 amount, uint256 timestamp);
+    event Subsidy (address indexed receiver, uint256 amount, uint256 timestamp);
 
     function _safeMint(address to, uint value) private {
         (bool success, bytes memory data) = _donation_token.call(abi.encodeWithSelector(SELECTOR_MINT, to, value));
@@ -310,7 +310,7 @@ contract DonationCenter {
             _day2_total_donated = _day2_total_donated + dai_amount;
         }
         
-        emit Donation(msg.sender, dai_amount);
+        emit Donation(msg.sender, dai_amount, block.timestamp);
         return true;
     }
 
@@ -332,7 +332,7 @@ contract DonationCenter {
         require(balance > 0, 'INSUFFICIENT_INPUT_AMOUNT');
         _safeBurnFrom(msg.sender, balance);
         _safeTransfer(_dai, msg.sender, balance);
-        emit Collection(msg.sender, balance);
+        emit Collection(msg.sender, balance, block.timestamp);
     }
     
     /** 
@@ -385,7 +385,7 @@ contract DonationCenter {
             _day2_total_subsidized = _day2_total_subsidized + _today_subsidy;
         }
 
-        emit Subsidy(msg.sender, _today_subsidy);
+        emit Subsidy(msg.sender, _today_subsidy, block.timestamp);
         
     }
 
