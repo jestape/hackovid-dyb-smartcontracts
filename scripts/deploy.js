@@ -24,15 +24,15 @@ var fs = require('fs');
 
 const DYBtokenABI = JSON.parse(fs.readFileSync('./abi/DYBToken.abi', 'utf8'));
 const DYBtokenBIN  = fs.readFileSync('./bin/DYBToken.bin', 'utf8');
-const DYBtokenSourceCode = fs.readFileSync('./contracts/DYBToken.sol', 'utf8');
+const DYBtokenSourceCode = fs.readFileSync('./contracts/DYB.sol', 'utf8');
 
 const DAItokenABI = JSON.parse(fs.readFileSync('./abi/DaiToken.abi', 'utf8'));
 const DAItokenBIN  = fs.readFileSync('./bin/DaiToken.bin', 'utf8');
-const DAItokenSourceCode = fs.readFileSync('./contracts/DYBToken.sol', 'utf8');
+const DAItokenSourceCode = fs.readFileSync('./contracts/DYB.sol', 'utf8');
 
 const donationABI = JSON.parse(fs.readFileSync('./abi/DonationCenter.abi', 'utf8'));
 const donationBIN  = fs.readFileSync('./bin/DonationCenter.bin', 'utf8');
-const donationSourceCode = fs.readFileSync('./contracts/DonationCenter.sol', 'utf8');
+const donationSourceCode = fs.readFileSync('./contracts/DYB.sol', 'utf8');
 
 (async () => {
 
@@ -109,7 +109,7 @@ const donationSourceCode = fs.readFileSync('./contracts/DonationCenter.sol', 'ut
 
     await DYBdeployedToken.methods.addLogic(deployedDonation.options.address).send({from: accounts[0]});
 
-    console.log("\n Account: " + accounts[0]);
+    console.log("\nAccount: " + accounts[0]);
     await DAIdeployedToken.methods.approve(deployedDonation.options.address, new BigNumber("1000000000000000000000000")).send({from: accounts[0]});
     console.log("Approved DAI: " + accounts[0]);
     await deployedDonation.methods.donate(10000).send({from: accounts[0]});
@@ -117,22 +117,26 @@ const donationSourceCode = fs.readFileSync('./contracts/DonationCenter.sol', 'ut
 
     var amounts = [0, 500, 2300, 1200, 1400, 100];
 
-    for (i = 1; i < 6; i++) {
+    for (i = 1; i <= 2; i++) {
 
-        console.log("\n Account: " + accounts[i]);
+        for (i = 1; i < 6; i++) {
 
-        await web3.eth.sendTransaction({from: accounts[0], to: accounts[i], value: web3.utils.toWei("0.05", 'ether')});
-        console.log("Sent ether to: " + accounts[i]);
+            console.log("\nAccount: " + accounts[i]);
 
-        await DAIdeployedToken.methods.transfer(accounts[i], amounts[i]*100).send({from:accounts[0]});
-        console.log("Sent DAI to: " + accounts[i]);
+            await web3.eth.sendTransaction({from: accounts[0], to: accounts[i], value: web3.utils.toWei("0.05", 'ether')});
+            console.log("Sent ether to: " + accounts[i]);
 
-        await DAIdeployedToken.methods.approve(deployedDonation.options.address, amounts[i]*100).send({from: accounts[i]});
-        console.log("Approved DAI: " + accounts[i]);
+            await DAIdeployedToken.methods.transfer(accounts[i], amounts[i]*100).send({from:accounts[0]});
+            console.log("Sent DAI to: " + accounts[i]);
 
-        await deployedDonation.methods.donate(amounts[i]*100).send({from: accounts[i]});
-        console.log("Donated DAI: " + accounts[i]);
+            await DAIdeployedToken.methods.approve(deployedDonation.options.address, amounts[i]*100).send({from: accounts[i]});
+            console.log("Approved DAI: " + accounts[i]);
 
-    } 
+            await deployedDonation.methods.donate(amounts[i]*100).send({from: accounts[i]});
+            console.log("Donated DAI: " + accounts[i]);
+
+        }
+
+    }
 
 })();

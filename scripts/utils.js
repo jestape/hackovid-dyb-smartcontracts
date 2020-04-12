@@ -22,9 +22,9 @@ var verify = function(key, address, sourcecode, contractname, parameters) {
 
         try {
             let result = await axios.post(`${getEtherscanUrl()}/api`, new URLSearchParams(data));
-            console.log(`Contract ${address} verified -> ${result.toString()}`)
+            //console.log(`Contract ${address} verified -> ${result.toString()}`)
         } catch (error) {
-            console.log(`Contract ${address} not verified -> ${error.toString()}`)
+            //console.log(`Contract ${address} not verified -> ${error.toString()}`)
         }
 
 

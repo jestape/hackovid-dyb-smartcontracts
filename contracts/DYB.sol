@@ -151,7 +151,7 @@ contract BuyerRole is ManagerRole, LogicRole {
     Roles.Role private _buyers;
 
     uint256 private _amount_buyers = 0;
-    mapping (address => uint256) private _subsidies_registry;
+    mapping (address => uint) private _subsidies_registry;
 
     modifier onlyBuyer() {
         require(isBuyer(_msgSender()), "BuyerRole: caller does not have the Buyer role");
@@ -170,11 +170,11 @@ contract BuyerRole is ManagerRole, LogicRole {
         _addBuyer(account);
     }
 
-    function getLastSubsidy(address account) public onlyLogic() returns (uint256) {
+    function getLastSubsidy(address account) public view onlyLogic() returns (uint) {
         return _subsidies_registry[account];
     }
 
-    function setLastSubsidy(address account, uint256 day) public onlyLogic() returns (bool) {
+    function setLastSubsidy(address account, uint day) public onlyLogic() returns (bool) {
         _subsidies_registry[account] = day;
     }
 
@@ -185,6 +185,7 @@ contract BuyerRole is ManagerRole, LogicRole {
     function _addBuyer(address account) internal {
         _buyers.add(account);
         _amount_buyers = _amount_buyers + 1;
+        _subsidies_registry[account] = 0;
         emit BuyerAdded(account);
     }
 
@@ -851,4 +852,197 @@ contract DaiToken is ERC20, ERC20Detailed {
     constructor() public ERC20Detailed("TestingDai", "tDAI", 2) {
         _mint(msg.sender, 1000000000000000000000000);
     }
+}
+
+/** 
+ *
+ * @dev A contract that is thought to create a Crowdsale for a token
+ * representing a pyshical asset. This crowdsale is thought to be:
+ *
+ * - Pausable, so that the owner can pause it in case of emergency.
+ * - Minted, so that tokens are minted directly.
+ * - Mintable, so that tokens are directly minted during the crowdsale.
+ * - Finalizable, so that it has a limited duration and has a finalization 
+ *   procedure explained in _finalization().
+ *
+ */
+
+contract DonationCenter {
+    using SafeMath for uint;
+
+    DaiToken private _dai;
+    DYBToken private _donation_token;
+
+    uint256 private _cicle = 0;
+    uint256 private _today = 0;
+
+    uint256 private _day1_total_donated = 0;
+    uint256 private _day2_total_donated = 0; 
+
+    uint256 private _day1_total_subsidized = 0;
+    uint256 private _day2_total_subsidized = 0; 
+
+    uint256 private _today_subsidy = 0;
+
+    uint256 constant DAILY_SUBSIDY_CAP = 4000;
+
+    event Donation (address indexed sender, uint256 amount, uint256 timestamp);
+    event Collection (address indexed sender, uint256 amount, uint256 timestamp);
+    event Subsidy (address indexed receiver, uint256 amount, uint256 timestamp);
+
+    /** 
+    *
+    * @dev Creates a new donation center contracts to donate dais representing euros
+    * to mint tokens so that they can be given for social matters.
+    *
+    * The tokens will be withdrawn from the contract _dai.
+    * The tokens will be minted in contract _donation_token.
+    */
+
+   constructor(address dai, address donation_token) public {
+       _dai = DaiToken(dai);
+       _donation_token = DYBToken(donation_token);
+       _today = block.timestamp;
+    }
+
+    function dai_address() public view returns (DaiToken) {
+        return _dai;
+    }
+    
+    function donation_token_address() public view returns (DYBToken) {
+        return _donation_token;
+    }
+
+    function cicle() public view returns (uint256) {
+        return _cicle;
+    }
+
+    function day1_total_donated() public view returns (uint256) {
+        return _day1_total_donated;
+    }
+
+    function day2_total_donated() public view returns (uint256) {
+        return _day2_total_donated;
+    }
+
+    function today_subsidy() public view returns (uint256) {
+        return _today_subsidy;
+    }
+
+    
+    /** 
+    *
+    * @dev  Stores `amount` dai tokens from the caller's account to the contract
+    * and mints `amount`of donation tokens to the contract.
+    *
+    * Returns a boolean value indicating whether the operation succeeded.
+    *
+    * Emits a {Donation} event.
+    * 
+    * The tokens will be withdrawn from the contract _dai.
+    * The tokens will be minted in contract _donation_token.
+    */
+ 
+    function donate(uint256 dai_amount) public returns (bool) {
+        require(dai_amount > 0, 'INSUFFICIENT_INPUT_AMOUNT');
+
+        _donation_token.mint(address(this), dai_amount);
+        _dai.transferFrom(msg.sender, address(this), dai_amount);
+
+        if (_cicle < 1) {
+            _day1_total_donated = _day1_total_donated + dai_amount;
+        } else {
+            _day2_total_donated = _day2_total_donated + dai_amount;
+        }
+        
+        emit Donation(msg.sender, dai_amount, block.timestamp);
+        return true;
+    }
+
+    /** 
+    *
+    * @dev Gives `amount` dai tokens from the contract's account to caller
+    * and burns `amount`of donation tokens to the contract.
+    *
+    * Returns a boolean value indicating whether the operation succeeded.
+    *
+    * Emits a {Collection} event.
+    *
+    * The tokens will be withdrawn from the contract _dai.
+    * The tokens will be minted in contract _donation_token.
+    */
+
+    function collectDai() public {
+
+        uint256 balance = _donation_token.balanceOf(msg.sender);
+        require(balance > 0, 'INSUFFICIENT_INPUT_AMOUNT');
+        
+        _donation_token.burnFrom(msg.sender, balance);
+        _dai.transfer(msg.sender, balance);
+
+        emit Collection(msg.sender, balance, block.timestamp);
+
+    }
+    
+    /** 
+    *
+    * @dev Gives `amount` donation tokens from the contract's account to caller
+    * if applies conditions.
+    *
+    * Returns a boolean value indicating whether the operation succeeded.
+    *
+    * Emits a {Subsidy} event.
+    *
+    */
+    
+    function getSubsidy() public {
+        
+        uint256 today = block.timestamp;
+
+        if (_cicle == 0) {
+
+            _today_subsidy = _day1_total_donated / _donation_token.amountBuyers();
+            _today = today;
+            _cicle = 1;
+
+        }  else if (today > _today + 1 days && _cicle == 1) {
+
+            _day2_total_donated = _day2_total_donated + _day1_total_donated - _day1_total_subsidized;
+            _day1_total_donated = 0;
+            _day1_total_subsidized = 0;
+            _today_subsidy = _day2_total_donated / _donation_token.amountBuyers();
+            _today = today;
+            _cicle = 2;
+
+        } else if (today > _today + 1 days && _cicle == 1) {
+
+            _day1_total_donated =  _day1_total_donated + _day2_total_donated - _day2_total_subsidized;
+            _day2_total_donated = 0;
+            _day2_total_subsidized = 0;
+            _today_subsidy = _day1_total_donated / _donation_token.amountBuyers();
+            _today = today;
+            _cicle = 1;
+
+        }
+
+        if (_today_subsidy > DAILY_SUBSIDY_CAP) {
+            _today_subsidy = DAILY_SUBSIDY_CAP;
+        }
+
+        require(_donation_token.isBuyer(msg.sender), 'Subsidy not accepted');
+        require(_donation_token.getLastSubsidy(msg.sender) != _today, 'Subsidy already given');
+
+        _donation_token.transfer(msg.sender, _today_subsidy);
+        _donation_token.setLastSubsidy(msg.sender, _today);
+        
+        if (_cicle == 1) {
+            _day1_total_subsidized = _day1_total_subsidized + _today_subsidy;
+        } else {
+            _day2_total_subsidized = _day2_total_subsidized + _today_subsidy;
+        }
+
+        emit Subsidy(msg.sender, _today_subsidy, block.timestamp);
+        
+    }
+
 }
